@@ -8,10 +8,12 @@ import gitlab
 import google.generativeai as genai
 from jira import JIRA
 from dotenv import load_dotenv
+import asyncio
 
 load_dotenv()
 
 app = FastAPI()
+review_lock = None
 
 JIRA_SERVER = os.getenv("JIRA_SERVER")
 JIRA_EMAIL = os.getenv("JIRA_EMAIL")
@@ -150,51 +152,56 @@ async def gitlab_webhook(request: Request):
         is_code_update = (action == "update" and "oldrev" in payload.get("object_attributes", {}))
         
         if object_kind == "merge_request" and (is_open or is_code_update):
-            project_id = payload["project"]["id"]
-            mr_iid = payload["object_attributes"]["iid"]
-            mr_title = payload["object_attributes"].get("title", "제목 없음")
-            mr_desc = payload["object_attributes"].get("description", "내용 없음")
-            
-            add_log(f"GitLab Webhook 수신: MR #{mr_iid} '{mr_title}' 분석 시작...")
-            
-            GITLAB_URL = os.getenv("GITLAB_URL", "https://lab.ssafy.com")
-            GITLAB_TOKEN = os.getenv("GITLAB_TOKEN")
-            
-            if not GITLAB_TOKEN or not os.getenv("GEMINI_API_KEY"):
-                add_log("오류: GitLab 토큰 또는 Gemini API 키가 없습니다.")
-                return {"status": "error", "message": "Missing GitLab or Gemini tokens"}
+            global review_lock
+            if review_lock is None:
+                review_lock = asyncio.Lock()
                 
-            gl = gitlab.Gitlab(GITLAB_URL, private_token=GITLAB_TOKEN)
-            gl.auth()
-            
-            project = gl.projects.get(project_id)
-            mr = project.mergerequests.get(mr_iid)
-            
-            # 변경점 수집
-            changes = mr.changes()
-            diff_text = ""
-            for change in changes.get('changes', []):
-                diff_text += f"---\nFile: {change['new_path']}\n"
-                diff_text += f"{change['diff']}\n\n"
+            async with review_lock:
+                project_id = payload["project"]["id"]
+                mr_iid = payload["object_attributes"]["iid"]
+                mr_title = payload["object_attributes"].get("title", "제목 없음")
+                mr_desc = payload["object_attributes"].get("description", "내용 없음")
                 
-            if diff_text:
-                add_log(f"MR #{mr_iid} Diff 추출 완료. Gemini AI에게 코드 리뷰 요청 중...")
-                # Gemini에게 리뷰 요청
-                model = genai.GenerativeModel('gemini-2.5-flash')
-                prompt = f"""다음은 GitLab Merge Request 정보와 코드 변경 사항이야. 코드 뿐만 아니라 MR 제목과 내용이 적절한지도 함께 리뷰해줘. 버그가 있거나 개선할 점은 마크다운으로 예쁘게 포맷팅해서 작성해.
+                add_log(f"GitLab Webhook 수신: MR #{mr_iid} '{mr_title}' 분석 시작...")
+                
+                GITLAB_URL = os.getenv("GITLAB_URL", "https://lab.ssafy.com")
+                GITLAB_TOKEN = os.getenv("GITLAB_TOKEN")
+                
+                if not GITLAB_TOKEN or not os.getenv("GEMINI_API_KEY"):
+                    add_log("오류: GitLab 토큰 또는 Gemini API 키가 없습니다.")
+                    return {"status": "error", "message": "Missing GitLab or Gemini tokens"}
+                    
+                gl = gitlab.Gitlab(GITLAB_URL, private_token=GITLAB_TOKEN)
+                gl.auth()
+                
+                project = gl.projects.get(project_id)
+                mr = project.mergerequests.get(mr_iid)
+                
+                # 변경점 수집
+                changes = mr.changes()
+                diff_text = ""
+                for change in changes.get('changes', []):
+                    diff_text += f"---\nFile: {change['new_path']}\n"
+                    diff_text += f"{change['diff']}\n\n"
+                    
+                if diff_text:
+                    add_log(f"MR #{mr_iid} Diff 추출 완료. Gemini AI에게 코드 리뷰 요청 중...")
+                    # Gemini에게 리뷰 요청
+                    model = genai.GenerativeModel('gemini-3.1-flash-lite')
+                    prompt = f"""다음은 GitLab Merge Request 정보와 코드 변경 사항이야. 코드 뿐만 아니라 MR 제목과 내용이 적절한지도 함께 리뷰해줘. 버그가 있거나 개선할 점은 마크다운으로 예쁘게 포맷팅해서 작성해.
 
 [MR 제목]: {mr_title}
 [MR 내용]: {mr_desc}
 
 [코드 변경사항]:
 {diff_text[:8000]}"""
-                response = model.generate_content(prompt)
-                
-                # MR 코멘트로 결과 작성
-                mr.notes.create({'body': f"🤖 **AI 통합 리뷰 봇** (자동 분석)\n\n{response.text}"})
-                add_log(f"✅ MR #{mr_iid} 리뷰 코멘트 작성 완료!")
-            else:
-                add_log(f"⚠️ MR #{mr_iid} 에 분석할 코드 변경사항이 없습니다.")
+                    response = await model.generate_content_async(prompt)
+                    
+                    # MR 코멘트로 결과 작성
+                    mr.notes.create({'body': f"🤖 **AI 통합 리뷰 봇** (자동 분석)\n\n{response.text}"})
+                    add_log(f"✅ MR #{mr_iid} 리뷰 코멘트 작성 완료!")
+                else:
+                    add_log(f"⚠️ MR #{mr_iid} 에 분석할 코드 변경사항이 없습니다.")
 
         return {"status": "success"}
     except Exception as e:
