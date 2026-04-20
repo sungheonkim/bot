@@ -38,53 +38,53 @@ async def create_issues(req: JiraRequest):
                     return name
             return pref
 
-    epic_type = get_type_name("Epic")
-    story_type = get_type_name("Story")
+        epic_type = get_type_name("Epic")
+        story_type = get_type_name("Story")
 
-    lines = req.content.strip().split("\n")
-    current_epic_issue = None
-    created_issues = []
+        lines = req.content.strip().split("\n")
+        current_epic_issue = None
+        created_issues = []
 
-    for line in lines:
-        line = line.strip()
-        if not line: continue
-        
-        # 1. Epic Header
-        if line.startswith("### **Epic"):
-            summary = line.replace("### **", "").replace("**", "")
-            fields = {
-                'project': req.project_key,
-                'summary': summary,
-                'description': "Created via JiraBot Web UI",
-                'issuetype': {'name': epic_type}
-            }
-            epic_issue = jira.create_issue(fields=fields)
-            current_epic_issue = epic_issue
-            created_issues.append({"key": epic_issue.key, "summary": summary, "type": "Epic"})
-            continue
-        
-        # 2. Story Header
-        if line.startswith("**스토리") or line.startswith("스토리"):
-            # 헤더(스토리 타이틀)는 지라 이슈로 올리지 않고 패스합니다. (유저 피드백)
-            continue
+        for line in lines:
+            line = line.strip()
+            if not line: continue
             
-        # 3. Bullet points
-        match = re.match(r"- \[(.*?)\] (.*)", line)
-        if match:
-            tags_str = match.group(1)
-            task_content = match.group(2)
-            tags = [t.strip() for t in tags_str.split("/")]
-            
-            for tag in tags:
-                summary = f"[{tag}] {task_content}"
+            # 1. Epic Header
+            if line.startswith("### **Epic"):
+                summary = line.replace("### **", "").replace("**", "")
                 fields = {
                     'project': req.project_key,
                     'summary': summary,
-                    'issuetype': {'name': story_type}
+                    'description': "Created via JiraBot Web UI",
+                    'issuetype': {'name': epic_type}
                 }
-                if current_epic_issue:
-                    fields['parent'] = {'id': current_epic_issue.id}
+                epic_issue = jira.create_issue(fields=fields)
+                current_epic_issue = epic_issue
+                created_issues.append({"key": epic_issue.key, "summary": summary, "type": "Epic"})
+                continue
+            
+            # 2. Story Header
+            if line.startswith("**스토리") or line.startswith("스토리"):
+                # 헤더(스토리 타이틀)는 지라 이슈로 올리지 않고 패스합니다. (유저 피드백)
+                continue
                 
+            # 3. Bullet points
+            match = re.match(r"- \[(.*?)\] (.*)", line)
+            if match:
+                tags_str = match.group(1)
+                task_content = match.group(2)
+                tags = [t.strip() for t in tags_str.split("/")]
+                
+                for tag in tags:
+                    summary = f"[{tag}] {task_content}"
+                    fields = {
+                        'project': req.project_key,
+                        'summary': summary,
+                        'issuetype': {'name': story_type}
+                    }
+                    if current_epic_issue:
+                        fields['parent'] = {'id': current_epic_issue.id}
+                    
                     issue = jira.create_issue(fields=fields)
                     created_issues.append({"key": issue.key, "summary": summary, "type": "Story"})
 
