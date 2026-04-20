@@ -1,9 +1,11 @@
 import os
 import re
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
+import gitlab
+import google.generativeai as genai
 from jira import JIRA
 from dotenv import load_dotenv
 
@@ -15,6 +17,10 @@ JIRA_SERVER = os.getenv("JIRA_SERVER")
 JIRA_EMAIL = os.getenv("JIRA_EMAIL")
 JIRA_API_TOKEN = os.getenv("JIRA_API_TOKEN")
 PROJECT_KEY = os.getenv("PROJECT_KEY", "").split(",")[0].strip()
+
+import google.generativeai as genai
+if os.getenv("GEMINI_API_KEY"):
+    genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
 def get_jira():
     return JIRA(server=JIRA_SERVER, basic_auth=(JIRA_EMAIL, JIRA_API_TOKEN))
@@ -91,6 +97,49 @@ async def create_issues(req: JiraRequest):
         return {"status": "success", "created": created_issues}
     except Exception as e:
         return {"status": "error", "message": f"Server Error: {str(e)}"}
+
+@app.post("/api/webhook/gitlab")
+async def gitlab_webhook(request: Request):
+    try:
+        payload = await request.json()
+        
+        # MR 생성/업데이트 이벤트인지 확인
+        if payload.get("object_kind") == "merge_request" and payload.get("object_attributes", {}).get("action") in ["open", "update"]:
+            project_id = payload["project"]["id"]
+            mr_iid = payload["object_attributes"]["iid"]
+            
+            GITLAB_URL = os.getenv("GITLAB_URL", "https://lab.ssafy.com")
+            GITLAB_TOKEN = os.getenv("GITLAB_TOKEN")
+            
+            if not GITLAB_TOKEN or not os.getenv("GEMINI_API_KEY"):
+                return {"status": "error", "message": "Missing GitLab or Gemini tokens"}
+                
+            gl = gitlab.Gitlab(GITLAB_URL, private_token=GITLAB_TOKEN)
+            gl.auth()
+            
+            project = gl.projects.get(project_id)
+            mr = project.mergerequests.get(mr_iid)
+            
+            # 변경점 수집
+            changes = mr.changes()
+            diff_text = ""
+            for change in changes.get('changes', []):
+                diff_text += f"---\nFile: {change['new_path']}\n"
+                diff_text += f"{change['diff']}\n\n"
+                
+            if diff_text:
+                # Gemini에게 리뷰 요청
+                model = genai.GenerativeModel('gemini-1.5-flash')
+                prompt = f"다음은 GitLab Merge Request의 코드 변경 사항이야. 변경된 내용을 요약하고 버그가 있거나 개선할 점이 있다면 코드 리뷰를 작성해줘. 마크다운으로 예쁘게 포맷팅해.\n\n{diff_text[:10000]}"
+                response = model.generate_content(prompt)
+                
+                # MR 코멘트로 결과 작성
+                mr.notes.create({'body': f"🤖 **AI 코드 리뷰 봇** (자동 분석)\n\n{response.text}"})
+
+        return {"status": "success"}
+    except Exception as e:
+        print("Webhook Error:", e)
+        return {"status": "error"}
 
 @app.get("/", response_class=HTMLResponse)
 async def get_index():
