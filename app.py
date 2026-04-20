@@ -114,7 +114,14 @@ async def gitlab_webhook(request: Request):
         payload = await request.json()
         
         # MR 생성/업데이트 이벤트인지 확인
-        if payload.get("object_kind") == "merge_request" and payload.get("object_attributes", {}).get("action") in ["open", "update"]:
+        action = payload.get("object_attributes", {}).get("action")
+        object_kind = payload.get("object_kind")
+        
+        is_open = (action == "open")
+        # GitLab에서 코드가 푸시되어 업데이트되는 경우 oldrev가 페이로드에 포함됨
+        is_code_update = (action == "update" and "oldrev" in payload.get("object_attributes", {}))
+        
+        if object_kind == "merge_request" and (is_open or is_code_update):
             project_id = payload["project"]["id"]
             mr_iid = payload["object_attributes"]["iid"]
             mr_title = payload["object_attributes"].get("title", "제목 없음")
