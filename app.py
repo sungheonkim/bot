@@ -187,7 +187,7 @@ async def gitlab_webhook(request: Request):
                 if diff_text:
                     add_log(f"MR #{mr_iid} Diff 추출 완료. Gemini AI에게 코드 리뷰 요청 중...")
                     # Gemini에게 리뷰 요청
-                    model = genai.GenerativeModel('gemini-3.1-flash-lite')
+                    model = genai.GenerativeModel('gemini-3.1-flash-lite-preview')
                     prompt = f"""다음은 GitLab Merge Request 정보와 코드 변경 사항이야. 코드 뿐만 아니라 MR 제목과 내용이 적절한지도 함께 리뷰해줘. 버그가 있거나 개선할 점은 마크다운으로 예쁘게 포맷팅해서 작성해.
 
 [MR 제목]: {mr_title}
