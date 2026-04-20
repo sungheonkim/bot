@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jira Automation Pro | Antigravity</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #050505;
+            --glass-bg: rgba(255, 255, 255, 0.03);
+            --accent-primary: #0072ff;
+            --accent-secondary: #00c6ff;
+            --text-color: #ffffff;
+            --text-dim: rgba(255, 255, 255, 0.6);
+            --neon-blue: 0 0 20px rgba(0, 198, 255, 0.4);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Outfit', sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            background-image: 
+                radial-gradient(circle at 20% 30%, rgba(0, 114, 255, 0.05) 0%, transparent 40%),
+                radial-gradient(circle at 80% 70%, rgba(0, 198, 255, 0.05) 0%, transparent 40%);
+            color: var(--text-color);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            overflow-x: hidden;
+        }
+
+        nav {
+            width: 100%;
+            padding: 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            max-width: 1200px;
+        }
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: 800;
+            background: linear-gradient(to right, var(--accent-primary), var(--accent-secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: -1px;
+        }
+
+        main {
+            flex: 1;
+            width: 100%;
+            max-width: 1000px;
+            padding: 2rem;
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
+        }
+
+        .hero {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .hero h1 {
+            font-size: 3.5rem;
+            font-weight: 800;
+            margin-bottom: 1rem;
+            letter-spacing: -2px;
+            line-height: 1;
+        }
+
+        .hero p {
+            color: var(--text-dim);
+            font-size: 1.2rem;
+        }
+
+        .glass-container {
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 24px;
+            padding: 2rem;
+            width: 100%;
+            box-shadow: 0 40px 100px rgba(0, 0, 0, 0.5);
+            animation: fadeIn 0.8s ease-out;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .project-input {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 1rem;
+            color: white;
+            font-size: 1rem;
+            width: 100%;
+            max-width: 300px;
+            outline: none;
+            transition: all 0.3s;
+        }
+
+        .project-input:focus {
+            border-color: var(--accent-secondary);
+            box-shadow: var(--neon-blue);
+        }
+
+        textarea {
+            width: 100%;
+            height: 300px;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            padding: 1.5rem;
+            color: var(--text-color);
+            font-size: 1rem;
+            line-height: 1.6;
+            resize: none;
+            outline: none;
+            transition: all 0.3s;
+        }
+
+        textarea:focus {
+            border-color: var(--accent-secondary);
+            box-shadow: var(--neon-blue);
+        }
+
+        label {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        button {
+            background: linear-gradient(45deg, var(--accent-primary), var(--accent-secondary));
+            color: white;
+            border: none;
+            padding: 1.2rem 2.5rem;
+            border-radius: 14px;
+            font-size: 1.1rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            align-self: flex-end;
+            margin-top: 1rem;
+            box-shadow: 0 10px 20px rgba(0, 114, 255, 0.2);
+        }
+
+        button:hover {
+            transform: translateY(-5px) scale(1.02);
+            box-shadow: 0 20px 40px rgba(0, 114, 255, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0) scale(0.98);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .results {
+            margin-top: 2rem;
+            display: none;
+            animation: slideUp 0.5s ease-out;
+        }
+
+        .log-list {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 1.5rem;
+            border-radius: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .log-item {
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 0.85rem;
+            display: flex;
+            gap: 1rem;
+            padding: 0.5rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .type-tag {
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-weight: 800;
+            font-size: 0.7rem;
+            text-transform: uppercase;
+        }
+
+        .type-epic { background: #6554c0; color: white; }
+        .type-story { background: #0052cc; color: white; }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.2); }
+
+    </style>
+</head>
+<body>
+    <nav>
+        <div class="logo">JIRABOT.IO</div>
+        <div style="color: var(--text-dim); font-size: 0.9rem;">Authenticated</div>
+    </nav>
+
+    <main>
+        <section class="hero">
+            <h1>Automate Your Workflow.</h1>
+            <p>Paste your markdown plan and watch as we transform it into a structured Jira hierarchy.</p>
+        </section>
+
+        <div class="glass-container">
+            <div class="form-group">
+                <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                    <label>Project Key</label>
+                    <input type="text" id="projectKey" class="project-input" placeholder="e.g. S14P31A405" value="S14P31A405">
+                </div>
+                
+                <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                    <label>Markdown Content</label>
+                    <textarea id="content" placeholder="### **Epic 0...&#10;- [FE/BE] Task description..."></textarea>
+                </div>
+
+                <button id="submitBtn">Generate Issues</button>
+            </div>
+
+            <div id="resultsArea" class="results">
+                <label style="display: block; margin-bottom: 1rem;">Execution logs</label>
+                <div id="logList" class="log-list">
+                    <!-- Logs will appear here -->
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        const submitBtn = document.getElementById('submitBtn');
+        const resultsArea = document.getElementById('resultsArea');
+        const logList = document.getElementById('logList');
+
+        submitBtn.addEventListener('click', async () => {
+            const content = document.getElementById('content').value;
+            const projectKey = document.getElementById('projectKey').value;
+
+            if (!content) {
+                alert('Please enter some content!');
+                return;
+            }
+
+            submitBtn.disabled = true;
+            submitBtn.innerText = 'Creating Jira Issues...';
+            resultsArea.style.display = 'block';
+            logList.innerHTML = '<div class="log-item" style="color: var(--accent-secondary)">> Initiating connection to Jira Cloud...</div>';
+
+            try {
+                const response = await fetch('/api/create-issues', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ content, project_key: projectKey })
+                });
+
+                const data = await response.json();
+
+                if (data.status === 'success') {
+                    logList.innerHTML += '<div class="log-item" style="color: #4ade80">> Batch creation completed successfully.</div>';
+                    data.created.forEach(issue => {
+                        const div = document.createElement('div');
+                        div.className = 'log-item';
+                        div.innerHTML = `
+                            <span class="type-tag type-${issue.type.toLowerCase()}">${issue.type}</span>
+                            <span style="color: var(--accent-secondary)">${issue.key}</span>
+                            <span style="color: var(--text-dim)">${issue.summary}</span>
+                        `;
+                        logList.appendChild(div);
+                    });
+                } else {
+                    throw new Error('Failed to create issues');
+                }
+            } catch (err) {
+                logList.innerHTML += `<div class="log-item" style="color: #f87171">> Error: ${err.message}</div>`;
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.innerText = 'Generate Again';
+            }
+        });
+    </script>
+</body>
+</html>
