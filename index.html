@@ -271,6 +271,16 @@
                 </div>
             </div>
         </div>
+
+        <div class="glass-container" style="display: flex; flex-direction: column; gap: 1rem; margin-top: -1rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h2 style="font-size: 1.2rem; font-weight: 600;">🤖 AI 봇 웹훅 수신 로그 (GitLab MR)</h2>
+                <button id="refreshLogsBtn" style="margin: 0; padding: 0.5rem 1rem; font-size: 0.9rem; border-radius: 8px;">새로고침</button>
+            </div>
+            <div id="webhookLogsArea" class="log-list" style="background: rgba(0,0,0,0.3); border: 1px solid rgba(0, 198, 255, 0.2);">
+                <div class="log-item" style="color: var(--text-dim); text-align: center;">새로고침을 눌러 최근 처리된 일들을 확인하세요.</div>
+            </div>
+        </div>
     </main>
 
     <script>
@@ -343,6 +353,40 @@
 - [AI/BE] 사용자 의도(Intent) 파악용 프롬프트 및 API 연동
 - [BE] 예외 처리(Fallback) 로직 개발`;
         });
+
+        // Webhook logs refresh logic
+        const refreshLogsBtn = document.getElementById('refreshLogsBtn');
+        const webhookLogsArea = document.getElementById('webhookLogsArea');
+        refreshLogsBtn.addEventListener('click', async () => {
+            refreshLogsBtn.innerText = '불러오는 중...';
+            try {
+                const res = await fetch('/api/logs');
+                const data = await res.json();
+                if (data.status === 'success') {
+                    webhookLogsArea.innerHTML = '';
+                    if (data.logs.length === 0) {
+                        webhookLogsArea.innerHTML = '<div class="log-item" style="color: var(--text-dim);">현재 기록된 최근 로그가 없습니다.</div>';
+                    } else {
+                        data.logs.forEach(msg => {
+                            const div = document.createElement('div');
+                            div.className = 'log-item';
+                            if (msg.includes('에러') || msg.includes('❌') || msg.includes('오류')) div.style.color = '#f87171';
+                            else if (msg.includes('✅') || msg.includes('완료')) div.style.color = '#4ade80';
+                            else div.style.color = 'var(--text-color)';
+                            div.innerText = msg;
+                            webhookLogsArea.appendChild(div);
+                        });
+                    }
+                }
+            } catch (err) {
+                webhookLogsArea.innerHTML = `<div class="log-item" style="color: #f87171;">로그를 불러오지 못했습니다: ${err.message}</div>`;
+            } finally {
+                refreshLogsBtn.innerText = '새로고침';
+            }
+        });
+        
+        // Auto fetch on load
+        refreshLogsBtn.click();
     </script>
 </body>
 </html>
