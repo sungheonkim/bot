@@ -252,8 +252,11 @@
                 </div>
                 
                 <div style="display: flex; flex-direction: column; gap: 0.5rem;">
-                    <label>Markdown Content</label>
-                    <textarea id="content" placeholder="### **Epic 0...&#10;- [FE/BE] Task description..."></textarea>
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <label>Markdown Content</label>
+                        <button id="exampleBtn" style="padding: 0.3rem 0.8rem; font-size: 0.8rem; border-radius: 6px; margin: 0; background: rgba(255,255,255,0.1); box-shadow: none;">Load Example</button>
+                    </div>
+                    <textarea id="content" placeholder="Paste your markdown plan here..."></textarea>
                 </div>
 
                 <button id="submitBtn">Generate Issues</button>
@@ -294,7 +297,13 @@
                     body: JSON.stringify({ content, project_key: projectKey })
                 });
 
-                const data = await response.json();
+                let data;
+                try {
+                    const text = await response.text();
+                    data = JSON.parse(text);
+                } catch (e) {
+                    throw new Error('Server returned invalid JSON. It might be misconfigured.');
+                }
 
                 if (data.status === 'success') {
                     logList.innerHTML += '<div class="log-item" style="color: #4ade80">> Batch creation completed successfully.</div>';
@@ -317,6 +326,19 @@
                 submitBtn.disabled = false;
                 submitBtn.innerText = 'Generate Again';
             }
+        });
+        document.getElementById('exampleBtn').addEventListener('click', (e) => {
+            e.preventDefault();
+            document.getElementById('content').value = `### **Epic 4. AI 기반 고객 응대 챗봇 구축 (Sprint 1)**
+
+**스토리 4-1. 챗봇 기본 UI/UX 및 컴포넌트 설계**
+- [FE] 챗봇 플로팅 버튼 및 대화창 팝업 컴포넌트 퍼블리싱
+- [FE] 유저-챗봇 간 말풍선 애니메이션 구현
+- [FE/BE] 챗봇 대화 기록 초기화 및 세션 유지 기획
+
+**스토리 4-2. LLM 연동 및 응답 파이프라인 구축**
+- [AI/BE] 사용자 의도(Intent) 파악용 프롬프트 및 API 연동
+- [BE] 예외 처리(Fallback) 로직 개발`;
         });
     </script>
 </body>

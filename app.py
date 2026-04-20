@@ -25,14 +25,18 @@ class JiraRequest(BaseModel):
 
 @app.post("/api/create-issues")
 async def create_issues(req: JiraRequest):
-    jira = get_jira()
-    available_types = {it.name: it.name for it in jira.issue_types()}
-    
-    def get_type_name(pref):
-        for name in available_types:
-            if pref.lower() in name.lower():
-                return name
-        return pref
+    try:
+        if not os.getenv("JIRA_SERVER") or not os.getenv("JIRA_EMAIL") or not os.getenv("JIRA_API_TOKEN"):
+            return {"status": "error", "message": "Jira Environment Variables are missing."}
+            
+        jira = get_jira()
+        available_types = {it.name: it.name for it in jira.issue_types()}
+        
+        def get_type_name(pref):
+            for name in available_types:
+                if pref.lower() in name.lower():
+                    return name
+            return pref
 
     epic_type = get_type_name("Epic")
     story_type = get_type_name("Story")
@@ -61,17 +65,7 @@ async def create_issues(req: JiraRequest):
         
         # 2. Story Header
         if line.startswith("**스토리") or line.startswith("스토리"):
-            summary = line.replace("**", "")
-            fields = {
-                'project': req.project_key,
-                'summary': summary,
-                'issuetype': {'name': story_type}
-            }
-            if current_epic_issue:
-                fields['parent'] = {'id': current_epic_issue.id}
-            
-            issue = jira.create_issue(fields=fields)
-            created_issues.append({"key": issue.key, "summary": summary, "type": "Story"})
+            # 헤더(스토리 타이틀)는 지라 이슈로 올리지 않고 패스합니다. (유저 피드백)
             continue
             
         # 3. Bullet points
@@ -91,10 +85,12 @@ async def create_issues(req: JiraRequest):
                 if current_epic_issue:
                     fields['parent'] = {'id': current_epic_issue.id}
                 
-                issue = jira.create_issue(fields=fields)
-                created_issues.append({"key": issue.key, "summary": summary, "type": "Story"})
+                    issue = jira.create_issue(fields=fields)
+                    created_issues.append({"key": issue.key, "summary": summary, "type": "Story"})
 
-    return {"status": "success", "created": created_issues}
+        return {"status": "success", "created": created_issues}
+    except Exception as e:
+        return {"status": "error", "message": f"Server Error: {str(e)}"}
 
 @app.get("/", response_class=HTMLResponse)
 async def get_index():
