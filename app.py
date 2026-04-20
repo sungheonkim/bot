@@ -22,15 +22,40 @@ import google.generativeai as genai
 if os.getenv("GEMINI_API_KEY"):
     genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
+KV_REST_API_URL = os.getenv("KV_REST_API_URL")
+KV_REST_API_TOKEN = os.getenv("KV_REST_API_TOKEN")
+
 # 서버리스 환경 임시 로그 저장 (최대 50개 유지)
 webhook_logs = []
 
 def add_log(msg: str):
-    import datetime
+    import datetime, json, urllib.request
     now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    webhook_logs.insert(0, f"[{now}] {msg}")
+    formatted_msg = f"[{now}] {msg}"
+    
+    webhook_logs.insert(0, formatted_msg)
     if len(webhook_logs) > 50:
         webhook_logs.pop()
+
+    # Vercel KV (Redis) 에 영구 보존
+    if KV_REST_API_URL and KV_REST_API_TOKEN:
+        try:
+            req = urllib.request.Request(
+                f"{KV_REST_API_URL}", 
+                data=json.dumps(["LPUSH", "bot_logs", formatted_msg]).encode("utf-8"),
+                headers={"Authorization": f"Bearer {KV_REST_API_TOKEN}", "Content-Type": "application/json"}
+            )
+            urllib.request.urlopen(req, timeout=3)
+            
+            # 최신 100개만 유지
+            req_trim = urllib.request.Request(
+                f"{KV_REST_API_URL}", 
+                data=json.dumps(["LTRIM", "bot_logs", "0", "99"]).encode("utf-8"),
+                headers={"Authorization": f"Bearer {KV_REST_API_TOKEN}", "Content-Type": "application/json"}
+            )
+            urllib.request.urlopen(req_trim, timeout=3)
+        except Exception as e:
+            print("KV 저장 실패:", e)
 
 def get_jira():
     return JIRA(server=JIRA_SERVER, basic_auth=(JIRA_EMAIL, JIRA_API_TOKEN))
@@ -103,9 +128,12 @@ async def create_issues(req: JiraRequest):
                     
                     issue = jira.create_issue(fields=fields)
                     created_issues.append({"key": issue.key, "summary": summary, "type": "Story"})
+                    add_log(f"✅ 지라 스토리 생성 완료: {issue.key}")
 
+        add_log("🎉 지라 일괄 생성 작업이 완료되었습니다!")
         return {"status": "success", "created": created_issues}
     except Exception as e:
+        add_log(f"❌ 지라 이슈 생성 에러: {str(e)}")
         return {"status": "error", "message": f"Server Error: {str(e)}"}
 
 @app.post("/api/webhook/gitlab")
@@ -176,6 +204,21 @@ async def gitlab_webhook(request: Request):
 
 @app.get("/api/logs")
 async def get_logs():
+    if KV_REST_API_URL and KV_REST_API_TOKEN:
+        import json, urllib.request
+        try:
+            req = urllib.request.Request(
+                f"{KV_REST_API_URL}", 
+                data=json.dumps(["LRANGE", "bot_logs", "0", "49"]).encode("utf-8"),
+                headers={"Authorization": f"Bearer {KV_REST_API_TOKEN}", "Content-Type": "application/json"}
+            )
+            response = urllib.request.urlopen(req, timeout=5)
+            data = json.loads(response.read().decode("utf-8"))
+            if "result" in data and isinstance(data["result"], list):
+                return {"status": "success", "logs": data["result"]}
+        except Exception as e:
+            print("KV 읽기 실패:", e)
+            
     return {"status": "success", "logs": webhook_logs}
 
 @app.get("/", response_class=HTMLResponse)
