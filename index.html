@@ -3,8 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Jira Automation Pro | Antigravity</title>
+    <title>Jira 자동화 도구 | Antigravity</title>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
     <style>
         :root {
             --bg-color: #050505;
@@ -20,7 +21,8 @@
             margin: 0;
             padding: 0;
             box-sizing: border-box;
-            font-family: 'Outfit', sans-serif;
+            font-family: 'Pretendard', 'Outfit', sans-serif;
+            word-break: keep-all;
         }
 
         body {
@@ -46,6 +48,7 @@
         }
 
         .logo {
+            font-family: 'Outfit', sans-serif;
             font-size: 1.5rem;
             font-weight: 800;
             background: linear-gradient(to right, var(--accent-primary), var(--accent-secondary));
@@ -72,9 +75,9 @@
         .hero h1 {
             font-size: 3.5rem;
             font-weight: 800;
-            margin-bottom: 1rem;
+            margin-bottom: 1.5rem;
             letter-spacing: -2px;
-            line-height: 1;
+            line-height: 1.2;
         }
 
         .hero p {
@@ -96,7 +99,7 @@
         .form-group {
             display: flex;
             flex-direction: column;
-            gap: 1rem;
+            gap: 1.5rem;
         }
 
         .project-input {
@@ -138,11 +141,10 @@
         }
 
         label {
-            font-size: 0.9rem;
+            font-size: 0.95rem;
             font-weight: 600;
             color: var(--text-dim);
-            text-transform: uppercase;
-            letter-spacing: 1px;
+            letter-spacing: 0.5px;
         }
 
         button {
@@ -235,35 +237,35 @@
 <body>
     <nav>
         <div class="logo">JIRABOT.IO</div>
-        <div style="color: var(--text-dim); font-size: 0.9rem;">Authenticated</div>
+        <div style="color: var(--text-dim); font-size: 0.9rem;">인증됨</div>
     </nav>
 
     <main>
         <section class="hero">
-            <h1>Automate Your Workflow.</h1>
-            <p>Paste your markdown plan and watch as we transform it into a structured Jira hierarchy.</p>
+            <h1>워크플로우의 자동화.</h1>
+            <p>기획안 마크다운을 붙여넣기만 하면, 즉시 구조화된 지라(Jira) 이슈 트리로 자동 변환됩니다.</p>
         </section>
 
         <div class="glass-container">
             <div class="form-group">
                 <div style="display: flex; flex-direction: column; gap: 0.5rem;">
-                    <label>Project Key</label>
-                    <input type="text" id="projectKey" class="project-input" placeholder="e.g. S14P31A405" value="S14P31A405">
+                    <label>프로젝트 키 (Project Key)</label>
+                    <input type="text" id="projectKey" class="project-input" placeholder="예: S14P31A405" value="S14P31A405">
                 </div>
                 
                 <div style="display: flex; flex-direction: column; gap: 0.5rem;">
                     <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <label>Markdown Content</label>
-                        <button id="exampleBtn" style="padding: 0.3rem 0.8rem; font-size: 0.8rem; border-radius: 6px; margin: 0; background: rgba(255,255,255,0.1); box-shadow: none;">Load Example</button>
+                        <label>마크다운 기획안</label>
+                        <button id="exampleBtn" style="padding: 0.3rem 0.8rem; font-size: 0.8rem; border-radius: 6px; margin: 0; background: rgba(255,255,255,0.1); box-shadow: none;">예시 불러오기</button>
                     </div>
-                    <textarea id="content" placeholder="Paste your markdown plan here..."></textarea>
+                    <textarea id="content" placeholder="여기에 마크다운 코드를 붙여넣으세요..."></textarea>
                 </div>
 
-                <button id="submitBtn">Generate Issues</button>
+                <button id="submitBtn">이슈 생성하기</button>
             </div>
 
             <div id="resultsArea" class="results">
-                <label style="display: block; margin-bottom: 1rem;">Execution logs</label>
+                <label style="display: block; margin-bottom: 1rem;">실행 로그</label>
                 <div id="logList" class="log-list">
                     <!-- Logs will appear here -->
                 </div>
@@ -281,14 +283,14 @@
             const projectKey = document.getElementById('projectKey').value;
 
             if (!content) {
-                alert('Please enter some content!');
+                alert('내용을 입력해 주세요!');
                 return;
             }
 
             submitBtn.disabled = true;
-            submitBtn.innerText = 'Creating Jira Issues...';
+            submitBtn.innerText = '지라 이슈 생성 중...';
             resultsArea.style.display = 'block';
-            logList.innerHTML = '<div class="log-item" style="color: var(--accent-secondary)">> Initiating connection to Jira Cloud...</div>';
+            logList.innerHTML = '<div class="log-item" style="color: var(--accent-secondary)">> Jira Cloud 연동 시작 중...</div>';
 
             try {
                 const response = await fetch('/api/create-issues', {
@@ -302,11 +304,11 @@
                     const text = await response.text();
                     data = JSON.parse(text);
                 } catch (e) {
-                    throw new Error('Server returned invalid JSON. It might be misconfigured.');
+                    throw new Error('서버 오류: 올바르지 않은 JSON 응답입니다. 환경 변수를 확인하세요.');
                 }
 
                 if (data.status === 'success') {
-                    logList.innerHTML += '<div class="log-item" style="color: #4ade80">> Batch creation completed successfully.</div>';
+                    logList.innerHTML += '<div class="log-item" style="color: #4ade80">> 모든 이슈가 성공적으로 생성되었습니다.</div>';
                     data.created.forEach(issue => {
                         const div = document.createElement('div');
                         div.className = 'log-item';
@@ -318,15 +320,16 @@
                         logList.appendChild(div);
                     });
                 } else {
-                    throw new Error('Failed to create issues');
+                    throw new Error(data.message || '이슈 생성에 실패했습니다.');
                 }
             } catch (err) {
-                logList.innerHTML += `<div class="log-item" style="color: #f87171">> Error: ${err.message}</div>`;
+                logList.innerHTML += `<div class="log-item" style="color: #f87171">> 에러 발생: ${err.message}</div>`;
             } finally {
                 submitBtn.disabled = false;
-                submitBtn.innerText = 'Generate Again';
+                submitBtn.innerText = '다시 생성하기';
             }
         });
+
         document.getElementById('exampleBtn').addEventListener('click', (e) => {
             e.preventDefault();
             document.getElementById('content').value = `### **Epic 4. AI 기반 고객 응대 챗봇 구축 (Sprint 1)**
