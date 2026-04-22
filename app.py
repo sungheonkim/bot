@@ -5,12 +5,13 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 import gitlab
-import google.generativeai as genai
+from openai import AsyncOpenAI
 from jira import JIRA
 from dotenv import load_dotenv
 import asyncio
 
 load_dotenv()
+# `.env` 파일 변경 감지를 위한 리로드 용도
 
 app = FastAPI()
 review_lock = None
@@ -20,10 +21,7 @@ JIRA_EMAIL = os.getenv("JIRA_EMAIL")
 JIRA_API_TOKEN = os.getenv("JIRA_API_TOKEN")
 PROJECT_KEY = os.getenv("PROJECT_KEY", "").split(",")[0].strip()
 
-import google.generativeai as genai
-if os.getenv("GEMINI_API_KEY"):
-    genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
-
+# genai configured via client per request
 KV_REST_API_URL = os.getenv("KV_REST_API_URL")
 KV_REST_API_TOKEN = os.getenv("KV_REST_API_TOKEN")
 
@@ -167,9 +165,10 @@ async def gitlab_webhook(request: Request):
                 GITLAB_URL = os.getenv("GITLAB_URL", "https://lab.ssafy.com")
                 GITLAB_TOKEN = os.getenv("GITLAB_TOKEN")
                 
-                if not GITLAB_TOKEN or not os.getenv("GEMINI_API_KEY"):
-                    add_log("오류: GitLab 토큰 또는 Gemini API 키가 없습니다.")
-                    return {"status": "error", "message": "Missing GitLab or Gemini tokens"}
+                gms_key = os.getenv("GMS_KEY", os.getenv("GEMINI_API_KEY"))
+                if not GITLAB_TOKEN or not gms_key:
+                    add_log("오류: GitLab 토큰 또는 GMS API 키가 없습니다.")
+                    return {"status": "error", "message": "Missing GitLab or GMS tokens"}
                     
                 gl = gitlab.Gitlab(GITLAB_URL, private_token=GITLAB_TOKEN)
                 gl.auth()
@@ -185,9 +184,12 @@ async def gitlab_webhook(request: Request):
                     diff_text += f"{change['diff']}\n\n"
                     
                 if diff_text:
-                    add_log(f"MR #{mr_iid} Diff 추출 완료. Gemini AI에게 코드 리뷰 요청 중...")
-                    # Gemini에게 리뷰 요청
-                    model = genai.GenerativeModel('gemini-3.1-flash-lite-preview')
+                    add_log(f"MR #{mr_iid} Diff 추출 완료. OpenAI (GPT-4.1-nano) 에게 코드 리뷰 요청 중...")
+                    # OpenAI (GMS) 리뷰 요청
+                    client = AsyncOpenAI(
+                        api_key=gms_key,
+                        base_url="https://gms.ssafy.io/gmsapi/api.openai.com/v1"
+                    )
                     prompt = f"""다음은 GitLab Merge Request 정보와 코드 변경 사항이야. 코드 뿐만 아니라 MR 제목과 내용이 적절한지도 함께 리뷰해줘. 버그가 있거나 개선할 점은 마크다운으로 예쁘게 포맷팅해서 작성해.
 
 [MR 제목]: {mr_title}
@@ -195,10 +197,19 @@ async def gitlab_webhook(request: Request):
 
 [코드 변경사항]:
 {diff_text[:8000]}"""
-                    response = await model.generate_content_async(prompt)
+                    response = await client.chat.completions.create(
+                        model="gpt-4.1-nano",
+                        messages=[
+                            {"role": "system", "content": "You are a helpful and expert AI code reviewer. Answer in Korean."},
+                            {"role": "user", "content": prompt}
+                        ],
+                        max_tokens=4096,
+                        temperature=0.3
+                    )
+                    review_content = response.choices[0].message.content
                     
                     # MR 코멘트로 결과 작성
-                    mr.notes.create({'body': f"🤖 **AI 통합 리뷰 봇** (자동 분석)\n\n{response.text}"})
+                    mr.notes.create({'body': f"🤖 **AI 통합 리뷰 봇 (GPT-4.1-nano)** (자동 분석)\n\n{review_content}"})
                     add_log(f"✅ MR #{mr_iid} 리뷰 코멘트 작성 완료!")
                 else:
                     add_log(f"⚠️ MR #{mr_iid} 에 분석할 코드 변경사항이 없습니다.")
@@ -227,6 +238,36 @@ async def get_logs():
             print("KV 읽기 실패:", e)
             
     return {"status": "success", "logs": webhook_logs}
+
+@app.get("/api/test-gms")
+async def test_gms(query: str = "안녕? 넌 어떤 모델이야?"):
+    try:
+        gms_key = os.getenv("GMS_KEY", os.getenv("GEMINI_API_KEY"))
+        if not gms_key:
+            return {"status": "error", "message": "GMS_KEY가 설정되지 않았습니다."}
+            
+        client = AsyncOpenAI(
+            api_key=gms_key,
+            base_url="https://gms.ssafy.io/gmsapi/api.openai.com/v1"
+        )
+        
+        response = await client.chat.completions.create(
+            model="gpt-4.1-nano",
+            messages=[
+                {"role": "system", "content": "You are a helpful AI assistant. Answer in Korean."},
+                {"role": "user", "content": query}
+            ],
+            max_tokens=1024,
+            temperature=0.7
+        )
+        
+        return {
+            "status": "success",
+            "model": "gpt-4.1-nano",
+            "reply": response.choices[0].message.content
+        }
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
 
 @app.get("/", response_class=HTMLResponse)
 async def get_index():

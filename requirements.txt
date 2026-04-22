@@ -5,4 +5,4 @@ fastapi
 uvicorn
 pydantic
 python-gitlab
-google-generativeai
+openai
