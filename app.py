@@ -184,7 +184,7 @@ async def gitlab_webhook(request: Request):
                     diff_text += f"{change['diff']}\n\n"
                     
                 if diff_text:
-                    add_log(f"MR #{mr_iid} Diff 추출 완료. OpenAI (GPT-4.1-nano) 에게 코드 리뷰 요청 중...")
+                    add_log(f"MR #{mr_iid} Diff 추출 완료. OpenAI (GPT-5.1) 에게 코드 리뷰 요청 중...")
                     # OpenAI (GMS) 리뷰 요청
                     client = AsyncOpenAI(
                         api_key=gms_key,
@@ -198,7 +198,7 @@ async def gitlab_webhook(request: Request):
 [코드 변경사항]:
 {diff_text[:8000]}"""
                     response = await client.chat.completions.create(
-                        model="gpt-4.1-nano",
+                        model="gpt-5.1",
                         messages=[
                             {"role": "system", "content": "You are a helpful and expert AI code reviewer. Answer in Korean."},
                             {"role": "user", "content": prompt}
@@ -209,7 +209,7 @@ async def gitlab_webhook(request: Request):
                     review_content = response.choices[0].message.content
                     
                     # MR 코멘트로 결과 작성
-                    mr.notes.create({'body': f"🤖 **AI 통합 리뷰 봇 (GPT-4.1-nano)** (자동 분석)\n\n{review_content}"})
+                    mr.notes.create({'body': f"🤖 **AI 통합 리뷰 봇 (GPT-5.1)** (자동 분석)\n\n{review_content}"})
                     add_log(f"✅ MR #{mr_iid} 리뷰 코멘트 작성 완료!")
                 else:
                     add_log(f"⚠️ MR #{mr_iid} 에 분석할 코드 변경사항이 없습니다.")
@@ -252,7 +252,7 @@ async def test_gms(query: str = "안녕? 넌 어떤 모델이야?"):
         )
         
         response = await client.chat.completions.create(
-            model="gpt-4.1-nano",
+            model="gpt-5.1",
             messages=[
                 {"role": "system", "content": "You are a helpful AI assistant. Answer in Korean."},
                 {"role": "user", "content": query}
@@ -263,7 +263,7 @@ async def test_gms(query: str = "안녕? 넌 어떤 모델이야?"):
         
         return {
             "status": "success",
-            "model": "gpt-4.1-nano",
+            "model": "gpt-5.1",
             "reply": response.choices[0].message.content
         }
     except Exception as e:
