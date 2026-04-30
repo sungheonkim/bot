@@ -203,7 +203,7 @@ async def gitlab_webhook(request: Request):
                             {"role": "system", "content": "You are a helpful and expert AI code reviewer. Answer in Korean."},
                             {"role": "user", "content": prompt}
                         ],
-                        max_tokens=4096,
+                        max_completion_tokens=4096,
                         temperature=0.3
                     )
                     review_content = response.choices[0].message.content
@@ -257,7 +257,7 @@ async def test_gms(query: str = "안녕? 넌 어떤 모델이야?"):
                 {"role": "system", "content": "You are a helpful AI assistant. Answer in Korean."},
                 {"role": "user", "content": query}
             ],
-            max_tokens=1024,
+            max_completion_tokens=1024,
             temperature=0.7
         )
         
